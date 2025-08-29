@@ -29,6 +29,7 @@
 		{{- end }}
 
 		fieldsInOrder := [...]string{ {{ range .Fields }}{{ quote .Name }},{{ end }} }
+		hadValidationError := false
 		for _, k := range fieldsInOrder {
 			v, ok := asMap[k]
 			if !ok {
@@ -51,7 +52,13 @@
 					{{ template "implDirectives" (dict "Field" $field "UseFunctionSyntaxForExecutionContext" $useFunctionSyntaxForExecutionContext) }}
 					tmp, err := directive{{$field.ImplDirectives|len}}(ctx)
 					if err != nil {
-						return {{$it}}, graphql.ErrorOnPath(ctx, err)
+						err = graphql.ErrorOnPath(ctx, err)
+						if gqlErr, ok := err.(*gqlerror.Error); ok {
+							errcode.Set(gqlErr, errcode.ValidationFailed)
+						}
+						graphql.AddError(ctx, err)
+						hadValidationError = true
+						continue
 					}
 					if data, ok := tmp.({{ $field.TypeReference.GO | ref }}) ; ok {
 						{{- if $field.IsResolver }}
@@ -77,7 +84,13 @@
 					{{- end }}
 					} else {
 						err := fmt.Errorf(`unexpected type %T from directive, should be {{ $field.TypeReference.GO }}`, tmp)
-						return {{$it}}, graphql.ErrorOnPath(ctx, err)
+						err = graphql.ErrorOnPath(ctx, err)
+						if gqlErr, ok := err.(*gqlerror.Error); ok {
+							errcode.Set(gqlErr, errcode.ValidationFailed)
+						}
+						graphql.AddError(ctx, err)
+						hadValidationError = true
+						continue
 					}
 				{{- else }}
 					{{- if $field.IsResolver }}
@@ -87,7 +100,13 @@
 						data, err := ec.{{ $field.TypeReference.UnmarshalFunc }}(ctx, v)
 						{{- end }}
 						if err != nil {
-							return {{$it}}, err
+							err = graphql.ErrorOnPath(ctx, err)
+							if gqlErr, ok := err.(*gqlerror.Error); ok {
+								errcode.Set(gqlErr, errcode.ValidationFailed)
+							}
+							graphql.AddError(ctx, err)
+							hadValidationError = true
+							continue
 						}
 						if err = ec.resolvers.{{ $field.ShortInvocation }}; err != nil {
 							return {{$it}}, err
@@ -99,7 +118,13 @@
 						data, err := ec.{{ $field.TypeReference.UnmarshalFunc }}(ctx, v)
 						{{- end }}
 						if err != nil {
-							return {{$it}}, err
+							err = graphql.ErrorOnPath(ctx, err)
+							if gqlErr, ok := err.(*gqlerror.Error); ok {
+								errcode.Set(gqlErr, errcode.ValidationFailed)
+							}
+							graphql.AddError(ctx, err)
+							hadValidationError = true
+							continue
 						}
 						{{- if $field.TypeReference.IsOmittable }}
 							{{ $lhs }} = graphql.OmittableOf(data)
@@ -110,6 +135,10 @@
 				{{- end }}
 			{{- end }}
 			}
+		}
+
+		if hadValidationError {
+			return {{$it}}, graphql.GetErrors(ctx)
 		}
 
 		return {{$it}}, nil

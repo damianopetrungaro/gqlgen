@@ -13,7 +13,9 @@
 {{ reserveImport "golang.org/x/sync/semaphore"}}
 {{ reserveImport "github.com/vektah/gqlparser/v2" "gqlparser" }}
 {{ reserveImport "github.com/vektah/gqlparser/v2/ast" }}
+{{ reserveImport "github.com/vektah/gqlparser/v2/gqlerror" }}
 {{ reserveImport "github.com/99designs/gqlgen/graphql" }}
+{{ reserveImport "github.com/99designs/gqlgen/graphql/errcode" }}
 {{ reserveImport "github.com/99designs/gqlgen/graphql/introspection" }}
 
 {{ $useFunctionSyntaxForExecutionContext := .Config.UseFunctionSyntaxForExecutionContext }}
